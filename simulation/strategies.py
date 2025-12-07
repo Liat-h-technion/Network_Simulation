@@ -1,7 +1,7 @@
 import random
 from collections import defaultdict, deque
-from typing import List, Tuple, Any, Dict
-from framework import Scheduler, Protocol, TrafficGenerator, Message, Network
+from typing import List, Tuple, Any, Dict, Set
+from simulation.framework import Scheduler, Protocol, TrafficGenerator, Message, Network
 
 
 # ---------------------------------------------------------
@@ -18,6 +18,67 @@ class EchoProtocol(Protocol):
         for target_id in range(n):
             if target_id != my_pid:
                 responses.append((target_id, f"Response from {my_pid} to msg {msg.id}"))
+        return responses
+
+
+class RandomSingleMessageProtocol(Protocol):
+    """
+    Upon receiving any message, sends a new message to a single process, chosen randomly with uniform probability.
+    """
+
+    def handle_message(self, my_pid: int, msg: Message, n: int) -> List[Tuple[int, Any]]:
+        responses = []
+        candidates = [pid for pid in range(n) if pid != my_pid]
+        if candidates:
+            target_id = random.choice(candidates)
+            content = f"Random forwarding from {my_pid} (origin: {msg.sender_id})"
+            responses.append((target_id, content))
+        return responses
+
+
+class PingPongProtocol(Protocol):
+    def handle_message(self, my_pid: int, msg: Message, network_n: int) -> List[Tuple[int, Any]]:
+        # Responds only to the original sender, and only if the sender's message isn't a response.
+        # In this protocol, each pair of nodes will communicate only once as request-response.
+        if "RESPONSE" not in str(msg.content):
+            return [(msg.sender_id, f"RESPONSE from {my_pid}")]
+        return []
+
+
+class RespondToSenderProtocol(Protocol):
+    def handle_message(self, my_pid: int, msg: Message, network_n: int) -> List[Tuple[int, Any]]:
+        return [(msg.sender_id, f"Response from {my_pid}")]
+
+
+class CommitteeProtocol(Protocol):
+    """
+    A Committee-to-All network:
+    1. Committee Members: Can send messages to anyone.
+    2. Regular Nodes: Can send messages only to Committee Members.
+    """
+    def __init__(self, committee_ids: Set[int]):
+        """
+        Args:
+            committee_ids: A set of process IDs that belong to the committee.
+        """
+        self.committee_ids = committee_ids
+
+    def handle_message(self, my_pid: int, msg: Message, network_n: int) -> List[Tuple[int, Any]]:
+        responses = []
+
+        if my_pid in self.committee_ids:
+            # The process is a Committee Member.
+            # Behavior: Broadcast to everyone (except myself).
+            for target_id in range(network_n):
+                if target_id != my_pid:
+                    responses.append((target_id, f"Committee Broadcast from {my_pid}"))
+
+        else:
+            # The process is a regular node.
+            # Behavior: Reply only to committee members.
+            for target_id in self.committee_ids:
+                responses.append((target_id, f"User Report from {my_pid} to Committee"))
+
         return responses
 
 
@@ -113,3 +174,33 @@ class AllToAllTrafficGenerator(TrafficGenerator):
                         receiver_id=receiver,
                         content=f"INIT {sender}->{receiver}"
                     )
+
+
+class CommitteeTrafficGenerator(TrafficGenerator):
+    """
+    Generates initial traffic respecting the committee topology.
+    Can operate in two modes:
+    1. 'all-to-committee': All nodes send a request to the committee.
+    2. 'committee-to-all': The committee broadcasts to everyone.
+    """
+    def __init__(self, committee_ids: Set[int], mode: str = 'inbound'):
+        self.committee_ids = committee_ids
+        self.mode = mode
+
+    def generate(self, network: Network):
+        print(f"--- Generating Committee Traffic (Mode: {self.mode}, Committee Size: {len(self.committee_ids)}) ---")
+
+        if self.mode == 'all-to-committee':
+            for sender in range(network.n):
+                for receiver in self.committee_ids:
+                    if sender != receiver:
+                        network.create_initial_message(sender, receiver, f"INIT_REQUEST {sender}->{receiver}")
+
+        elif self.mode == 'committee-to-all':
+            for sender in self.committee_ids:
+                for receiver in range(network.n):
+                    if sender != receiver:
+                        network.create_initial_message(sender, receiver, f"INIT_COMMAND {sender}->{receiver}")
+
+        else:
+            raise ValueError(f"Invalid mode '{self.mode}'. Expected 'all-to-committee' or 'committee-to-all'.")

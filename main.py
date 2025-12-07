@@ -1,17 +1,21 @@
-from framework import Simulator
-from strategies import EchoProtocol, RandomAsynchronousScheduler, AllToAllTrafficGenerator
+import math
+
+from simulation.framework import Simulator
+from simulation.strategies import *
 
 if __name__ == "__main__":
     # Configuration
-    N_NODES = 10
-    MAX_STEPS = 1000
+    N_NODES = 20
+    COMMITTEE_SIZE = max(3, int(math.sqrt(N_NODES))) # Here I chose a commitee with size sqrt(n), we can change that.
+    MAX_STEPS = 5000
     SEED = 42
 
     # Setup
+    committee = set(range(COMMITTEE_SIZE))
     sim = Simulator(
         n=N_NODES,
-        protocol=EchoProtocol(),
-        traffic_generator=AllToAllTrafficGenerator(),
+        protocol=CommitteeProtocol(committee_ids=committee),
+        traffic_generator=CommitteeTrafficGenerator(committee_ids=committee, mode='all-to-committee'),
         scheduler=RandomAsynchronousScheduler(seed=SEED)
     )
 
@@ -19,11 +23,9 @@ if __name__ == "__main__":
     sim.run(max_steps=MAX_STEPS)
 
     # Analyze
-    avg_delay = sim.get_average_delay()
-    connected, total = sim.get_connectivity_stats()
-
     print("\n--- Analysis Results ---")
-    print(f"Average Delay: {avg_delay:.2f} time ticks")
-    print(f"Connectivity: {connected}/{total} pairs communicated ({connected / total:.1%})")
+    sim.analyzer.print_connectivity_stats()
+    sim.analyzer.print_delay_stats()
+    sim.analyzer.plot_delay_histogram()
 
     sim.print_logs(limit=5)

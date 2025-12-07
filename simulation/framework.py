@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Any, Dict
+from simulation.analysis import Analyzer
 
 
 # ---------------------------------------------------------
@@ -233,6 +234,7 @@ class Simulator:
         self.network = Network(self.scheduler, self.n)
         self.network.initialize_processes(protocol)
         self.traffic_generator = traffic_generator
+        self.analyzer = Analyzer(self.network)
 
     def run(self, max_steps: int) -> int:
         """
@@ -258,30 +260,6 @@ class Simulator:
         print(f"--- Simulation Finished after {steps_executed} steps ---")
         return steps_executed
 
-    # -----------------------------------------------------
-    # Analysis Methods
-    # -----------------------------------------------------
-    def get_average_delay(self) -> float:
-        """Calculates the average delay of all delivered messages."""
-        delays = [x['delay'] for x in self.network.logs if x['event_type'] == 'DELIVERED']
-        if not delays:
-            return 0.0
-        return sum(delays) / len(delays)
-
-    def get_connectivity_stats(self) -> Tuple[int, int]:
-        """
-        Returns (successful_pairs, total_possible_pairs).
-        Checks how many unique (Sender->Receiver) links successfully delivered at least one message.
-        """
-        successful_links = set()
-        for log in self.network.logs:
-            if log['event_type'] == 'DELIVERED':
-                successful_links.add((log['sender_id'], log['receiver_id']))
-
-        # In a directed graph, total connections excluding self-loops is n*(n-1)
-        total_possible = self.n * (self.n - 1)
-        return len(successful_links), total_possible
-
     def print_logs(self, limit=10):
         print(f"\n--- Message Delivery Logs (First {limit} Steps) ---")
         delivered = [x for x in self.network.logs if x['event_type'] == "DELIVERED"]
@@ -292,6 +270,6 @@ class Simulator:
         print(f"\n--- Network Logs (First {limit} Steps) ---")
         stats = [x for x in self.network.logs if x['event_type'] == "STEP_STATS"]
         for stat in stats[:limit]:
-            print(
-                f"Step {stat['global_time']}: Pending links: {stat['pending_links']}, pending messages: {stat['total_pending_messages']}")
-
+            print(f"Step {stat['global_time']}: ",
+                  f"Pending links: {stat['pending_links']}, ",
+                  f"pending messages: {stat['total_pending_messages']}")
