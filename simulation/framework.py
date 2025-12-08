@@ -265,7 +265,7 @@ class Simulator:
         delivered = [x for x in self.network.logs if x['event_type'] == "DELIVERED"]
         for l in delivered[:limit]:
             print(
-                f"Time {l['create_time']}->{l['create_time'] + l['delay']}: From pid {l['sender_id']} to pid {l['receiver_id']} (Delay: {l['delay']})")
+                f"Create Time: {l['create_time']} | Deliver Time: {l['create_time'] + l['delay']} | From pid {l['sender_id']} to pid {l['receiver_id']} (Delay: {l['delay']})")
 
         print(f"\n--- Network Logs (First {limit} Steps) ---")
         stats = [x for x in self.network.logs if x['event_type'] == "STEP_STATS"]

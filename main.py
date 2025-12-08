@@ -7,16 +7,16 @@ if __name__ == "__main__":
     # Configuration
     N_NODES = 20
     COMMITTEE_SIZE = int(math.sqrt(N_NODES))  # Here I chose a committee with size sqrt(n), we can change that.
-    MAX_STEPS = 5000
-    SEED = 42
+    MAX_STEPS = 20
+    SEED = 100
 
     # Setup
     # The committee members are consistently the nodes numbered between [0, COMMITTEE_SIZE], we can change that.
     committee = set(range(COMMITTEE_SIZE))
     sim = Simulator(
         n=N_NODES,
-        protocol=CommitteeProtocol(committee_ids=committee),
-        traffic_generator=CommitteeTrafficGenerator(committee_ids=committee, mode='all-to-committee'),
+        protocol=RespondToAllProtocol(),
+        traffic_generator=AllToAllTrafficGenerator(),
         scheduler=RandomAsynchronousScheduler(seed=SEED)
     )
 

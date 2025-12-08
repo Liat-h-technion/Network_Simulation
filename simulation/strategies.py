@@ -7,7 +7,7 @@ from simulation.framework import Scheduler, Protocol, TrafficGenerator, Message,
 # ---------------------------------------------------------
 # Protocol Strategies
 # ---------------------------------------------------------
-class EchoProtocol(Protocol):
+class RespondToAllProtocol(Protocol):
     """
     Upon receiving any message, broadcast a new message to every other process.
     """

@@ -30,7 +30,7 @@ SEED = 42              # Random seed for reproducibility
 To change how nodes communicate, edit the Simulator initialization in ```main.py``` by swapping the classes below.
 
 ### Available Protocols (Node Logic)
-* ```EchoProtocol```: Upon receiving a message, broadcasts to all nodes. 
+* ```RespondToAllProtocol```: Upon receiving a message, broadcasts to all nodes. 
 * ```RandomSingleMessageProtocol```: Forwards received messages to one random node. 
 * ```PingPongProtocol```: Replies only once to the sender (in a single request-response form).
 * ```RespondToSenderProtocol```: Always sends a response back to the sender. 
