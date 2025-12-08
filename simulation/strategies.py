@@ -183,7 +183,7 @@ class CommitteeTrafficGenerator(TrafficGenerator):
     1. 'all-to-committee': All nodes send a request to the committee.
     2. 'committee-to-all': The committee broadcasts to everyone.
     """
-    def __init__(self, committee_ids: Set[int], mode: str = 'inbound'):
+    def __init__(self, committee_ids: Set[int], mode):
         self.committee_ids = committee_ids
         self.mode = mode
 

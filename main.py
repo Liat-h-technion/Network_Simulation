@@ -6,7 +6,7 @@ from simulation.strategies import *
 if __name__ == "__main__":
     # Configuration
     N_NODES = 20
-    COMMITTEE_SIZE = max(3, int(math.sqrt(N_NODES)))  # Here I chose a committee with size sqrt(n), we can change that.
+    COMMITTEE_SIZE = int(math.sqrt(N_NODES))  # Here I chose a committee with size sqrt(n), we can change that.
     MAX_STEPS = 5000
     SEED = 42
 
