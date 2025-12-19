@@ -7,7 +7,7 @@ from simulation.analysis import Analyzer
 # Message Class
 # ---------------------------------------------------------
 class Message:
-    def __init__(self, msg_id, sender_id, receiver_id, create_time, content=""):
+    def __init__(self, msg_id, sender_id, receiver_id, create_time, content):
         self.id = msg_id
         self.sender_id = sender_id
         self.receiver_id = receiver_id
@@ -47,6 +47,13 @@ class Protocol(ABC):
             (target_receiver_id, content_of_response)
         """
         pass
+
+    def initialize_process_data(self):
+        """
+        TODO: Add a comment
+        :return:
+        """
+        return {}
 
 
 # ---------------------------------------------------------
@@ -108,10 +115,11 @@ class TrafficGenerator(ABC):
 # Process Class
 # ---------------------------------------------------------
 class Process:
-    def __init__(self, pid: int, my_protocol: Protocol, n: int):
+    def __init__(self, pid: int, my_protocol: Protocol, n: int, data: dict):
         self.id = pid
         self.protocol = my_protocol
         self.n = n
+        self.data = data
 
     def handle_received_message(self, msg: Message) -> List[Tuple[int, Any]]:
         """
@@ -138,7 +146,8 @@ class Network:
     def initialize_processes(self, protocol: Protocol):
         """Creates N processes with the specific protocol."""
         for i in range(self.n):
-            self.processes[i] = Process(i, protocol, self.n)
+            data = protocol.initialize_process_data()
+            self.processes[i] = Process(i, protocol, self.n, data)
 
     def create_initial_message(self, sender_id, receiver_id, content):
         """Helper to kickstart the simulation."""
