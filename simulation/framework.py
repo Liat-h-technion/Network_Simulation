@@ -151,6 +151,7 @@ class Network:
         self.n = n
         self.processes: Dict[int, Process] = {}
         self.logs: List[Dict[str, Any]] = []
+        self.delay_logs: List[int] = []  # List of message delays (for delay distribution analysis)
         self.msg_id_counter = 0
 
     def initialize_processes(self, protocol: Protocol):
@@ -176,10 +177,11 @@ class Network:
             "sender_id": msg.sender_id,
             "receiver_id": msg.receiver_id,
             "create_time": msg.create_time,
-            "delay": delay,
-            "content": msg.content
+            "delay": delay
         }
         self.logs.append(log_entry)
+        if msg.deliver_time is not None:
+            self.delay_logs.append(delay)
 
     def log_step_stats(self):
         """Logs the system state at the end of a step."""
@@ -225,7 +227,7 @@ class Network:
             self.scheduler.add_message(new_msg)
             self.log_msg(new_msg)
 
-        self.log_step_stats()
+        # self.log_step_stats()
         return True
 
 

@@ -43,7 +43,7 @@ class Analyzer:
         return [x for x in self.network.logs if x['event_type'] == 'DELIVERED']
 
     def _get_delays(self) -> List[int]:
-        return [x['delay'] for x in self._get_delivered_logs()]
+        return self.network.delay_logs
 
     # ---------------------------------------------------------
     # Textual Analysis
