@@ -150,9 +150,12 @@ class Network:
         self.scheduler = scheduler
         self.n = n
         self.processes: Dict[int, Process] = {}
+        self.msg_id_counter = 0  # Used for assigning a unique msg id to a new message.
+
+        # Fields for tracking messages and network connectivity:
         self.logs: List[Dict[str, Any]] = []
         self.delay_logs: List[int] = []  # List of message delays (for delay distribution analysis)
-        self.msg_id_counter = 0
+        self.successful_links = set()  # Track (sender, receiver) links with successful communication
 
     def initialize_processes(self, protocol: Protocol):
         """Creates N processes with the specific protocol."""
@@ -209,6 +212,9 @@ class Network:
         msg.mark_delivered(self.global_time)
         self.log_msg(msg)
 
+        # Update the successful_links set, if this is the first communication in that (sender, receiver) link
+        self.successful_links.add((msg.sender_id, msg.receiver_id))
+
         # Process handles message using its protocol to generate new traffic
         # Then, the network asks the scheduler to schedule each generated response
         receiver_process = self.processes[msg.receiver_id]
@@ -229,6 +235,15 @@ class Network:
 
         # self.log_step_stats()
         return True
+
+    def print_processes_decisions(self):
+        """
+        Prints the decision of each process in the network.
+        This method can be used with consensus protocols that implement the print_decision methods. Protocols that don't
+        implement this method will print nothing.
+        """
+        for pid, p in self.processes.items():
+            p.protocol.print_decision(pid, p.data)
 
 
 # ---------------------------------------------------------
@@ -257,12 +272,12 @@ class Simulator:
         self.traffic_generator = traffic_generator
         self.analyzer = Analyzer(self.network)
 
-    def run(self, max_steps: int) -> int:
+    def run(self, max_steps: int, analysis_interval: int, display_plots: bool) -> int:
         """
         Runs the simulation.
-
         1. Triggers traffic generation.
         2. Runs the loop for `max_steps`.
+           Once in every analysis_interval steps, performs connectivity analysis.
 
         Returns:
             The number of steps actually executed.
@@ -278,9 +293,13 @@ class Simulator:
                 break
             steps_executed += 1
 
+            if steps_executed % analysis_interval == 0:
+                self.analyzer.print_connectivity_stats()
+                if display_plots:
+                    self.analyzer.plot_network_topology()
+
         print(f"--- Simulation Finished after {steps_executed} steps ---")
-        for pid, p in self.network.processes.items():
-            p.protocol.print_decision(pid, p.data)
+        self.network.print_processes_decisions()
 
         return steps_executed
 

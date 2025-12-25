@@ -1,5 +1,6 @@
 import statistics
 import math
+import networkx as nx
 from typing import List, TYPE_CHECKING, Optional
 
 # ---------------------------------------------------------
@@ -53,102 +54,46 @@ class Analyzer:
         Analyzes the network topology based on delivered messages.
         Checks for Full Connectivity, Strong Connectivity, and Partitions.
         """
-        # 1. Collect Data
-        successful_links = set()
-        for log in self._get_delivered_logs():
-            successful_links.add((log['sender_id'], log['receiver_id']))
-
+        links = self.network.successful_links
         n = self.network.n
+        curr_time = self.network.global_time
+
         total_possible = n * (n - 1)
-        connected_count = len(successful_links)
+        connected_count = len(links)
 
-        # 2. Print Basic Stats
-        print(f"\n--- Connectivity Analysis ---")
-        if total_possible > 0:
-            print(f"Direct Links: {connected_count}/{total_possible} ({connected_count / total_possible:.1%})")
+        print(f"\n--- Connectivity Analysis @ Step {curr_time} ---")
+        print(f"Direct Links: {connected_count}/{total_possible} ({connected_count / total_possible:.1%})")
+
+        # Create undirected graph for partitions check
+        G_undirected = nx.Graph()
+        G_undirected.add_nodes_from(range(n))
+        G_undirected.add_edges_from(links)
+
+        # Partition Analysis
+        partitions = list(nx.connected_components(G_undirected))
+        num_partitions = len(partitions)
+
+        if num_partitions > 1:
+            print(f"Topology: PARTITIONED ({num_partitions} Groups)")
+            for i, group in enumerate(partitions, 1):
+                print(f"   Group {i}: {sorted(list(group))}")
+            return  # Exit early: if partitioned, the graph can't be strongly connected
+
+        # If not partitioned, create the Directed version for checking strong connectivity and full mesh
+        G_directed = nx.DiGraph()
+        G_directed.add_nodes_from(range(n))
+        G_directed.add_edges_from(links)
+
+        if nx.is_strongly_connected(G_directed):
+            if connected_count == total_possible:
+                print("Topology: FULLY CONNECTED (Clique / Full Mesh)")
+                print("-> Every node communicated directly with every other node.")
+            else:
+                print("Topology: STRONGLY CONNECTED")
+                print("-> A directed path exists between every pair of nodes (Information flows everywhere).")
         else:
-            print("Direct Links: 0/0 (N < 2)")
-
-        # ---------------------------------------------------------
-        # 3. Partition Analysis (Weakly Connected Components)
-        # ---------------------------------------------------------
-        # Build UNDIRECTED adjacency list to find isolated islands
-        adj_undirected = {i: set() for i in range(n)}
-        for u, v in successful_links:
-            adj_undirected[u].add(v)
-            adj_undirected[v].add(u)
-
-        partitions = []
-        visited = set()
-
-        for node_id in range(n):
-            if node_id not in visited:
-                # Start a new partition discovery
-                component = set()
-                queue = [node_id]
-                visited.add(node_id)
-                component.add(node_id)
-
-                while queue:
-                    curr = queue.pop(0)
-                    for neighbor in adj_undirected[curr]:
-                        if neighbor not in visited:
-                            visited.add(neighbor)
-                            component.add(neighbor)
-                            queue.append(neighbor)
-                partitions.append(component)
-
-        # ---------------------------------------------------------
-        # 4. Strong Connectivity Analysis
-        # ---------------------------------------------------------
-        is_strongly_connected = False
-        is_full_mesh = (connected_count == total_possible and n > 1)
-
-        # We only check for strong connectivity if the graph is not partitioned
-        if len(partitions) == 1:
-            # Build DIRECTED adjacency list
-            adj_directed = {i: set() for i in range(n)}
-            for u, v in successful_links:
-                adj_directed[u].add(v)
-
-            # Check if every node can reach every other node
-            is_strongly_connected = True
-            for start_node in range(n):
-                # BFS from start_node respecting direction
-                bfs_visited = {start_node}
-                bfs_queue = [start_node]
-                while bfs_queue:
-                    curr = bfs_queue.pop(0)
-                    for neighbor in adj_directed[curr]:
-                        if neighbor not in bfs_visited:
-                            bfs_visited.add(neighbor)
-                            bfs_queue.append(neighbor)
-
-                if len(bfs_visited) != n:
-                    is_strongly_connected = False
-                    break
-
-        # ---------------------------------------------------------
-        # 5. Final Classification Print
-        # ---------------------------------------------------------
-        if is_full_mesh:
-            print("Topology: FULLY CONNECTED (Clique / Full Mesh)")
-            print("-> Every node communicated directly with every other node.")
-
-        elif is_strongly_connected:
-            print("Topology: STRONGLY CONNECTED")
-            print("-> A directed path exists between every pair of nodes (Information flows everywhere).")
-
-        elif len(partitions) == 1:
             print("Topology: WEAKLY CONNECTED")
             print("-> The graph is one piece, but information cannot flow freely in all directions.")
-
-        else:
-            print(f"Topology: PARTITIONED ({len(partitions)} Disconnected Groups)")
-            print("-> The network is split. Nodes in one group cannot reach nodes in another.")
-            for i, part in enumerate(partitions, 1):
-                # Sort for cleaner printing
-                print(f"   Group {i}: {sorted(list(part))}")
 
     def print_delay_stats(self):
         """Prints statistical summary of message delays."""
@@ -171,32 +116,10 @@ class Analyzer:
         print(f"Max:    {max_val}")
         print(f"Min:    {min_val}")
 
-    def print_load_stats(self):
-        """Prints average backlog and contention from stats logs."""
-        stats_logs = [x for x in self.network.logs if x['event_type'] == 'STEP_STATS']
-
-        if not stats_logs:
-            print("No stats recorded.")
-            return
-
-        backlogs = [x['total_backlog'] for x in stats_logs]
-        links = [x['pending_links'] for x in stats_logs]
-
-        avg_backlog = sum(backlogs) / len(backlogs)
-        avg_links = sum(links) / len(links)
-
-        print(f"\n--- Network Load Statistics ---")
-        print(f"Avg Backlog: {avg_backlog:.1f} messages")
-        print(f"Max Backlog: {max(backlogs)} messages")
-        print(f"Avg Pending Links: {avg_links:.1f}")
-
     # ---------------------------------------------------------
     # Plotting & Visualization
     # ---------------------------------------------------------
     def plot_delay_histogram(self, bins=20, filename: Optional[str] = None):
-        """
-        Standard plotting method using pyplot.
-        """
         if not MATPLOTLIB_AVAILABLE:
             print("Error: 'matplotlib' not installed.")
             return
@@ -225,79 +148,19 @@ class Analyzer:
             # This should now open a popup window without crashing PyCharm
             plt.show()
 
-    def get_histogram_as_array(self, bins=20):
-        """
-        Generates the plot in memory and returns it as a NumPy array.
-        Uses a robust backend (Agg) to avoid GUI issues.
-        """
-        if not MATPLOTLIB_AVAILABLE:
-            print("Error: 'matplotlib' or 'numpy' not installed.")
-            return None
-
-        delays = self._get_delays()
-        if not delays:
-            return None
-
-        fig = Figure(figsize=(10, 6))
-        canvas = FigureCanvasAgg(fig)
-        ax = fig.add_subplot(111)
-
-        ax.hist(delays, bins=bins, color='lightgreen', edgecolor='black', alpha=0.7)
-        ax.set_title('Delay Distribution (In-Memory)')
-        ax.set_xlabel('Delay')
-        ax.set_ylabel('Frequency')
-
-        canvas.draw()
-        rgba_buffer = canvas.buffer_rgba()
-        img_array = np.asarray(rgba_buffer)
-        rgb_array = img_array[:, :, :3]
-
-        return rgb_array
-
-    def print_network_partitions(self):
-        """
-        Identifies and prints network partitions (Weakly Connected Components).
-        If the network is split, this will list the separate groups of nodes.
-        """
+    def plot_network_topology(self):
+        links = self.network.successful_links
         n = self.network.n
 
-        # 1. Build an UNDIRECTED adjacency list
-        # We treat communication as a connection regardless of direction.
-        # If A talks to B, or B talks to A, they are in the same 'partition'.
-        adj = {i: set() for i in range(n)}
-        for log in self._get_delivered_logs():
-            u, v = log['sender_id'], log['receiver_id']
-            adj[u].add(v)
-            adj[v].add(u)  # Add reverse link for undirected check
+        plt.clf()  # Clear the current figure
 
-        # 2. Find Components using BFS
-        visited = set()
-        partitions = []
+        # Create the Graph
+        G = nx.Graph()
+        G.add_nodes_from(range(n))
+        G.add_edges_from(links)
 
-        for node_id in range(n):
-            if node_id not in visited:
-                # Found a new unvisited node -> It starts a new partition
-                current_partition = set()
-                queue = [node_id]
-                visited.add(node_id)
-                current_partition.add(node_id)
+        pos = nx.spring_layout(G, k=1/math.sqrt(n), iterations=int(math.sqrt(n)))
 
-                while queue:
-                    curr = queue.pop(0)
-                    for neighbor in adj[curr]:
-                        if neighbor not in visited:
-                            visited.add(neighbor)
-                            current_partition.add(neighbor)
-                            queue.append(neighbor)
-
-                partitions.append(current_partition)
-
-        # 3. Print Analysis
-        print(f"\n--- Network Partition Analysis ---")
-        if len(partitions) == 1:
-            print(f"Status: Intact (1 Component)")
-            print(f"Nodes:  {partitions[0]}")
-        else:
-            print(f"Status: PARTITIONED ({len(partitions)} disconnected groups)")
-            for i, part in enumerate(partitions, 1):
-                print(f"  Group {i} (Size {len(part)}): {sorted(list(part))}")
+        plt.title(f"Network Topology - Step {self.network.global_time}\nLinks: {len(links)}")
+        nx.draw(G, pos, node_size=30, alpha=0.5)
+        plt.pause(1)  # Keep the GUI open for 1s
