@@ -176,7 +176,6 @@ class Algorithm3Protocol(Protocol):
 
                     values = [val for val, sigs in process_data['v_map'].values()]
                     process_data['final_v'] = max(set(values), key=values.count)
-                    print(f"Process {my_pid} decided on value {process_data['final_v']}")
                     return []
 
             # Broadcast my v_map to everyone at the start of a new round.

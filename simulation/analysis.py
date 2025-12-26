@@ -56,12 +56,12 @@ class Analyzer:
         """
         links = self.network.successful_links
         n = self.network.n
-        curr_time = self.network.global_time
+        steps = self.network.global_time
 
         total_possible = n * (n - 1)
         connected_count = len(links)
 
-        print(f"\n--- Connectivity Analysis @ Step {curr_time} ---")
+        print(f"\n--- Connectivity Analysis (After {steps} Steps) ---")
         print(f"Direct Links: {connected_count}/{total_possible} ({connected_count / total_possible:.1%})")
 
         # Create undirected graph for partitions check

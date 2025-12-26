@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Any, Dict
 from simulation.analysis import Analyzer
-
+from datetime import datetime
 
 # ---------------------------------------------------------
 # Message Class
@@ -145,7 +145,7 @@ class Process:
 # Network Class
 # ---------------------------------------------------------
 class Network:
-    def __init__(self, scheduler: Scheduler, n: int):
+    def __init__(self, scheduler: Scheduler, n: int, enable_full_logs: bool = False):
         self.global_time = 0
         self.scheduler = scheduler
         self.n = n
@@ -153,7 +153,8 @@ class Network:
         self.msg_id_counter = 0  # Used for assigning a unique msg id to a new message.
 
         # Fields for tracking messages and network connectivity:
-        self.logs: List[Dict[str, Any]] = []
+        self.enable_full_logs: bool = enable_full_logs
+        self.logs: List[Dict[str, Any]] = []  # Full logs are documented if enable_full_logs=True
         self.delay_logs: List[int] = []  # List of message delays (for delay distribution analysis)
         self.successful_links = set()  # Track (sender, receiver) links with successful communication
 
@@ -171,20 +172,23 @@ class Network:
         self.log_msg(msg)
 
     def log_msg(self, msg: Message):
-        event = "DELIVERED" if msg.deliver_time is not None else "CREATED"
-        delay = (msg.deliver_time - msg.create_time) if msg.deliver_time is not None else None
-
-        log_entry = {
-            "event_type": event,
-            "message_id": msg.id,
-            "sender_id": msg.sender_id,
-            "receiver_id": msg.receiver_id,
-            "create_time": msg.create_time,
-            "delay": delay
-        }
-        self.logs.append(log_entry)
+        delay = None
         if msg.deliver_time is not None:
+            delay = msg.deliver_time - msg.create_time
             self.delay_logs.append(delay)
+            self.successful_links.add((msg.sender_id, msg.receiver_id))
+
+        if self.enable_full_logs:
+            event = "DELIVERED" if msg.deliver_time is not None else "CREATED"
+            self.logs.append({
+                "event_type": event,
+                "message_id": msg.id,
+                "sender_id": msg.sender_id,
+                "receiver_id": msg.receiver_id,
+                "create_time": msg.create_time,
+                "delay": delay,
+                "content": str(msg.content)
+            })
 
     def log_step_stats(self):
         """Logs the system state at the end of a step."""
@@ -242,6 +246,7 @@ class Network:
         This method can be used with consensus protocols that implement the print_decision methods. Protocols that don't
         implement this method will print nothing.
         """
+        print("\n--- Processes Final Decisions ---")
         for pid, p in self.processes.items():
             p.protocol.print_decision(pid, p.data)
 
@@ -255,7 +260,8 @@ class Simulator:
     Responsible for initialization, execution, and providing analysis tools.
     """
 
-    def __init__(self, n: int, protocol: Protocol, traffic_generator: TrafficGenerator, scheduler: Scheduler):
+    def __init__(self, n: int, protocol: Protocol, traffic_generator: TrafficGenerator, scheduler: Scheduler,
+                 enable_full_logs: bool, analysis_interval: int, display_plots: bool):
         """
         Initialize the simulation environment.
 
@@ -267,12 +273,14 @@ class Simulator:
         """
         self.n = n
         self.scheduler = scheduler
-        self.network = Network(self.scheduler, self.n)
+        self.network = Network(self.scheduler, self.n, enable_full_logs)
         self.network.initialize_processes(protocol)
         self.traffic_generator = traffic_generator
         self.analyzer = Analyzer(self.network)
+        self.analysis_interval = analysis_interval
+        self.display_plots = display_plots
 
-    def run(self, max_steps: int, analysis_interval: int, display_plots: bool) -> int:
+    def run(self, max_steps: int) -> int:
         """
         Runs the simulation.
         1. Triggers traffic generation.
@@ -282,6 +290,7 @@ class Simulator:
         Returns:
             The number of steps actually executed.
         """
+        sim_start = datetime.now()
         # 1. Generate Initial Traffic
         self.traffic_generator.generate(self.network)
 
@@ -293,22 +302,23 @@ class Simulator:
                 break
             steps_executed += 1
 
-            if steps_executed % analysis_interval == 0:
+            if steps_executed % self.analysis_interval == 0:
                 self.analyzer.print_connectivity_stats()
-                if display_plots:
+                if self.display_plots:
                     self.analyzer.plot_network_topology()
 
-        print(f"--- Simulation Finished after {steps_executed} steps ---")
+        sim_end = datetime.now()
+        print(f"--- Simulation Finished after {steps_executed} steps (run time: {sim_end - sim_start} seconds) ---")
         self.network.print_processes_decisions()
 
         return steps_executed
 
     def print_logs(self, limit=10):
-        print(f"\n--- Message Delivery Logs (First {limit} Steps) ---")
+        print(f"\n--- Message Delivery Logs ({limit} Steps) ---")
         delivered = [x for x in self.network.logs if x['event_type'] == "DELIVERED"]
         for l in delivered[:limit]:
             print(
-                f"Create Time: {l['create_time']} | Deliver Time: {l['create_time'] + l['delay']} | From pid {l['sender_id']} to pid {l['receiver_id']} (Delay: {l['delay']})")
+                f"Create Time: {l['create_time']} | Deliver Time: {l['create_time'] + l['delay']} | From pid {l['sender_id']} to pid {l['receiver_id']} (Delay: {l['delay']}) with content: {l['content']}")
 
         print(f"\n--- Network Logs (First {limit} Steps) ---")
         stats = [x for x in self.network.logs if x['event_type'] == "STEP_STATS"]
