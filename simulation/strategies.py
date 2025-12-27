@@ -36,7 +36,7 @@ class RandomSingleMessageProtocol(Protocol):
         return responses
 
 
-class PingPongProtocol(Protocol):
+class RequestResponseProtocol(Protocol):
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
         # Responds only to the original sender, and only if the sender's message isn't a response.
         # In this protocol, each pair of nodes will communicate only once as request-response.
@@ -45,8 +45,9 @@ class PingPongProtocol(Protocol):
         return []
 
 
-class RespondToSenderProtocol(Protocol):
+class PingPongProtocol(Protocol):
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
+        # Responds to the sender of the received message.
         return [(msg.sender_id, f"Response from {my_pid}")]
 
 
