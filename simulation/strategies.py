@@ -7,7 +7,7 @@ from simulation.framework import Scheduler, Protocol, TrafficGenerator, Message,
 # ---------------------------------------------------------
 # Protocol Strategies
 # ---------------------------------------------------------
-class RespondToAllProtocol(Protocol):
+class EchoAllProtocol(Protocol):
     """
     Upon receiving any message, broadcast a new message to every other process.
     """
@@ -111,8 +111,9 @@ class Algorithm3Protocol(Protocol):
             "final_v": -1
         }
 
-    def print_decision(self, pid: int, process_data: dict):
+    def print_decision(self, pid: int, process_data: dict) -> bool:
         print(f"Process {pid} decided {process_data['final_v']}")
+        return True
 
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
         """
@@ -279,7 +280,6 @@ class AllToAllTrafficGenerator(TrafficGenerator):
     """
 
     def generate(self, network: Network):
-        print(f"--- Generating All-to-All Initial Traffic (N={network.n}) ---")
         for sender in range(network.n):
             for receiver in range(network.n):
                 if sender != receiver:
@@ -302,8 +302,6 @@ class CommitteeTrafficGenerator(TrafficGenerator):
         self.mode = mode
 
     def generate(self, network: Network):
-        print(f"--- Generating Committee Traffic (Mode: {self.mode}, Committee Size: {len(self.committee_ids)}) ---")
-
         if self.mode == 'all-to-committee':
             for sender in range(network.n):
                 for receiver in self.committee_ids:

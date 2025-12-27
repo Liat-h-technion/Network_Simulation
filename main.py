@@ -6,7 +6,7 @@ from simulation.strategies import *
 
 PROTOCOLS = {
     "alg3": Algorithm3Protocol,
-    "respond_all": RespondToAllProtocol,
+    "echo_all": EchoAllProtocol,
     "ping_pong": PingPongProtocol,
     "committee": CommitteeProtocol
 }
@@ -91,6 +91,7 @@ def main():
     # Analysis
     print("\n--- Analysis Results ---")
     sim.analyzer.print_connectivity_stats()
+    sim.analyzer.print_connectivity_milestones()
     sim.analyzer.print_delay_stats()
     if sim.display_plots:
         sim.analyzer.plot_delay_histogram()

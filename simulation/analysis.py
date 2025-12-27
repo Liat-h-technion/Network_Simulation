@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 class Analyzer:
     def __init__(self, network: 'Network'):
         self.network = network
+        self.weakly_connected_at = None
+        self.strongly_connected_at = None
 
     # ---------------------------------------------------------
     # Helper Methods
@@ -53,6 +55,10 @@ class Analyzer:
         """
         Analyzes the network topology based on delivered messages.
         Checks for Full Connectivity, Strong Connectivity, and Partitions.
+
+        Records the first time step (when this function was called) that the network reaches weak and strong
+        connectivity milestones in the 'weakly_connected_at' and 'strongly_connected_at' fields.
+        For high precision, call this function often using a small --analysis_interval value.
         """
         links = self.network.successful_links
         n = self.network.n
@@ -91,9 +97,21 @@ class Analyzer:
             else:
                 print("Topology: STRONGLY CONNECTED")
                 print("-> A directed path exists between every pair of nodes (Information flows everywhere).")
+                if self.strongly_connected_at is None:
+                    self.strongly_connected_at = self.network.global_time
         else:
             print("Topology: WEAKLY CONNECTED")
             print("-> The graph is one piece, but information cannot flow freely in all directions.")
+            if self.weakly_connected_at is None:
+                self.weakly_connected_at = self.network.global_time
+
+    def print_connectivity_milestones(self):
+        if self.weakly_connected_at:
+            print("\n--- Connectivity Milestones ---")
+            print("-- For higher precision, use a smaller --analysis-interval value")
+            print(f"Weakly Connected at step:   {self.weakly_connected_at}")
+            if self.strongly_connected_at:
+                print(f"Strongly Connected at step: {self.strongly_connected_at}")
 
     def print_delay_stats(self):
         """Prints statistical summary of message delays."""

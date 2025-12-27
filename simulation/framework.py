@@ -246,7 +246,7 @@ class Network:
         This method can be used with consensus protocols that implement the print_decision methods. Protocols that don't
         implement this method will print nothing.
         """
-        print("\n--- Processes Final Decisions ---")
+        print("\n")
         for pid, p in self.processes.items():
             p.protocol.print_decision(pid, p.data)
 
@@ -305,13 +305,16 @@ class Simulator:
                 break
             steps_executed += 1
 
-            if self.analysis_interval and steps_executed % self.analysis_interval == 0:
+            # Perform connectivity analysis every analysis_interval steps, until reaching strong connectivity.
+            # If the graph is not yet weakly connected and display_plots flag was used, also plot the network graph.
+            if self.analysis_interval and steps_executed % self.analysis_interval == 0 \
+                    and self.analyzer.strongly_connected_at is None:
                 self.analyzer.print_connectivity_stats()
-                if self.display_plots:
+                if self.display_plots and self.analyzer.weakly_connected_at is None:
                     self.analyzer.plot_network_topology()
 
         sim_end = datetime.now()
-        print(f"--- Simulation Finished after {steps_executed} steps (run time: {sim_end - sim_start} seconds) ---")
+        print(f"\n--- Simulation Finished after {steps_executed} steps (run time: {sim_end - sim_start} seconds) ---")
         self.network.print_processes_decisions()
 
         return steps_executed
