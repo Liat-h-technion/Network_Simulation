@@ -280,29 +280,32 @@ class Simulator:
         self.analysis_interval = analysis_interval
         self.display_plots = display_plots
 
-    def run(self, max_steps: int) -> int:
+    def run(self, max_steps: int | None = None) -> int:
         """
         Runs the simulation.
         1. Triggers traffic generation.
-        2. Runs the loop for `max_steps`.
-           Once in every analysis_interval steps, performs connectivity analysis.
+        2. Runs the loop for `max_steps`. If 'max_steps' is not specified, will run indefinitely.
+           Once in every analysis_interval steps, performs connectivity analysis. If analysis_interval is None, will
+           not perform mid-simulation analysis.
 
         Returns:
             The number of steps actually executed.
         """
         sim_start = datetime.now()
+        limit = max_steps if max_steps is not None else float('inf')
+
         # 1. Generate Initial Traffic
         self.traffic_generator.generate(self.network)
 
-        print(f"--- Starting Simulation Loop (Max Steps: {max_steps}) ---")
+        print(f"--- Starting Simulation Loop (Max Steps: {limit}) ---")
         steps_executed = 0
-        for _ in range(max_steps):
+        while steps_executed < limit:
             if not self.network.run_step():
                 print("Simulation stopped: No more pending messages.")
                 break
             steps_executed += 1
 
-            if steps_executed % self.analysis_interval == 0:
+            if self.analysis_interval and steps_executed % self.analysis_interval == 0:
                 self.analyzer.print_connectivity_stats()
                 if self.display_plots:
                     self.analyzer.plot_network_topology()
@@ -314,15 +317,17 @@ class Simulator:
         return steps_executed
 
     def print_logs(self, limit=10):
-        print(f"\n--- Message Delivery Logs ({limit} Steps) ---")
         delivered = [x for x in self.network.logs if x['event_type'] == "DELIVERED"]
-        for l in delivered[:limit]:
-            print(
-                f"Create Time: {l['create_time']} | Deliver Time: {l['create_time'] + l['delay']} | From pid {l['sender_id']} to pid {l['receiver_id']} (Delay: {l['delay']}) with content: {l['content']}")
+        if len(delivered) > 0:
+            print(f"\n--- Message Delivery Logs ({limit} Steps) ---")
+            for l in delivered[:limit]:
+                print(
+                    f"Create Time: {l['create_time']} | Deliver Time: {l['create_time'] + l['delay']} | From pid {l['sender_id']} to pid {l['receiver_id']} (Delay: {l['delay']}) with content: {l['content']}")
 
-        print(f"\n--- Network Logs (First {limit} Steps) ---")
         stats = [x for x in self.network.logs if x['event_type'] == "STEP_STATS"]
-        for stat in stats[:limit]:
-            print(f"Step {stat['global_time']}: ",
-                  f"Pending links: {stat['pending_links']}, ",
-                  f"pending messages: {stat['total_pending_messages']}")
+        if len(stats) > 0:
+            print(f"\n--- Network Logs ({limit} Steps) ---")
+            for stat in stats[:limit]:
+                print(f"Step {stat['global_time']}: ",
+                      f"Pending links: {stat['pending_links']}, ",
+                      f"pending messages: {stat['total_pending_messages']}")
