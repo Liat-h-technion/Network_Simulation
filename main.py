@@ -1,8 +1,9 @@
 import argparse
-import math
 
 from simulation.framework import Simulator
-from simulation.strategies import *
+from simulation.strategies.protocols import *
+from simulation.strategies.schedulers import *
+from simulation.strategies.traffic_generators import *
 
 PROTOCOLS = {
     "alg3": Algorithm3Protocol,

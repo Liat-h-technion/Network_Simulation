@@ -3,6 +3,7 @@ from typing import List, Tuple, Any, Dict
 from simulation.analysis import Analyzer
 from datetime import datetime
 
+
 # ---------------------------------------------------------
 # Message Class
 # ---------------------------------------------------------
@@ -65,6 +66,7 @@ class Protocol(ABC):
         :return:
         """
         pass
+
 
 # ---------------------------------------------------------
 # Scheduler Interface
@@ -309,9 +311,9 @@ class Simulator:
             # If the graph is not yet weakly connected and display_plots flag was used, also plot the network graph.
             if self.analysis_interval and steps_executed % self.analysis_interval == 0 \
                     and self.analyzer.strongly_connected_at is None:
-                self.analyzer.print_connectivity_stats()
                 if self.display_plots and self.analyzer.weakly_connected_at is None:
                     self.analyzer.plot_network_topology()
+                self.analyzer.print_connectivity_stats()
 
         sim_end = datetime.now()
         print(f"\n--- Simulation Finished after {steps_executed} steps (run time: {sim_end - sim_start} seconds) ---")

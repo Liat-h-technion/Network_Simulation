@@ -132,11 +132,13 @@ Below is a detailed list of all available flags in `main.py`:
 
 ```
 .
-├── main.py                 # Entry point: Argument parsing and simulation setup
-├── requirements.txt        # Python dependencies
+├── main.py                         # Entry point: Argument parsing and simulation setup
+├── requirements.txt                # Python dependencies
 └── simulation/
-    ├── analysis.py         # Network connectivity stats and plotting (Analyzer class)
-    ├── framework.py        # Core classes: Message, Network, Process, Simulator
-    └── strategies.py       # Implementation of Protocols, Schedulers, and Traffic
-
+    ├── analysis.py                 # Network connectivity stats and plotting (Analyzer class)
+    ├── framework.py                # Core classes: Message, Network, Process, Simulator
+    └── strategies/                 
+        ├── protocols.py            # Implementations of Protocol strategies
+        ├── schedulers.py           # Implementations of Scheduler strategies
+        └── traffic_generators.py   # Implementations of Traffic Generator strategies
 ```
