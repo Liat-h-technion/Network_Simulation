@@ -3,6 +3,7 @@ from typing import List, Tuple, Any, Dict
 from simulation.analysis import Analyzer
 from datetime import datetime
 
+
 # ---------------------------------------------------------
 # Message Class
 # ---------------------------------------------------------
@@ -22,7 +23,7 @@ class Message:
         return f"<Msg {self.id}: {self.sender_id}->{self.receiver_id} content={self.content}>"
 
 
-# --- Abstract Interfaces (Protocol, Scheduler, TrafficGenerator) ---
+# --- Abstract Interfaces (Protocol, Scheduler, TrafficGenerator, FaultInjector) ---
 
 # ---------------------------------------------------------
 # Protocol Interface
@@ -62,9 +63,9 @@ class Protocol(ABC):
         This function can be used in consensus-related protocols, where a process have a final "decision"
         :param pid: The id of the process that utilizes the protocol.
         :param process_data: The data dictionary of the process that utilizes the protocol.
-        :return:
         """
         pass
+
 
 # ---------------------------------------------------------
 # Scheduler Interface
@@ -101,6 +102,10 @@ class Scheduler(ABC):
         """Returns the total number of messages waiting across the entire system."""
         pass
 
+    def handle_process_death(self, pid):
+        """Remove all pending messages to the dead process."""
+        pass
+
 
 # ---------------------------------------------------------
 # TrafficGenerator Interface
@@ -122,6 +127,23 @@ class TrafficGenerator(ABC):
 
 
 # ---------------------------------------------------------
+# FaultInjector Interface
+# ---------------------------------------------------------
+class FaultInjector(ABC):
+    """
+    Abstract Base Class for fault injections.
+    Determines if and when processes crash during the simulation.
+    """
+    @abstractmethod
+    def generate_faults(self, network: 'Network'):
+        """
+        Called at the beginning of every simulation step.
+        Can kill processes by calling process.kill().
+        """
+        pass
+
+
+# ---------------------------------------------------------
 # Process Class
 # ---------------------------------------------------------
 class Process:
@@ -130,6 +152,7 @@ class Process:
         self.protocol = my_protocol
         self.n = n
         self.data = data
+        self.alive = True
 
     def handle_received_message(self, msg: Message) -> List[Tuple[int, Any]]:
         """
@@ -140,16 +163,20 @@ class Process:
         """
         return self.protocol.handle_message(self.id, self.data, msg, self.n)
 
+    def kill(self):
+        self.alive = False
+
 
 # ---------------------------------------------------------
 # Network Class
 # ---------------------------------------------------------
 class Network:
-    def __init__(self, scheduler: Scheduler, n: int, enable_full_logs: bool = False):
+    def __init__(self, scheduler: Scheduler, n: int, fault_injector: FaultInjector, enable_full_logs: bool = False):
         self.global_time = 0
         self.scheduler = scheduler
         self.n = n
         self.processes: Dict[int, Process] = {}
+        self.fault_injector = fault_injector
         self.msg_id_counter = 0  # Used for assigning a unique msg id to a new message.
 
         # Fields for tracking messages and network connectivity:
@@ -163,6 +190,16 @@ class Network:
         for i in range(self.n):
             data = protocol.initialize_process_data()
             self.processes[i] = Process(i, protocol, self.n, data)
+
+    def kill_process(self, pid: int):
+        """Handle process death from the network. The scheduler removes pending messages to this process."""
+        if self.processes[pid].alive:
+            self.processes[pid].kill()
+            # Remove pending messages to this node from the scheduler
+            self.scheduler.handle_process_death(pid)
+
+            if self.enable_full_logs:
+                print(f"Process {pid} CRASHED at time step {self.global_time}")
 
     def create_initial_message(self, sender_id, receiver_id, content):
         """Helper to kickstart the simulation."""
@@ -201,7 +238,13 @@ class Network:
         self.logs.append(log_entry)
 
     def run_step(self):
-        """Executes exactly one event delivery."""
+        """
+        Executes exactly one event delivery.
+        Returns False if there are no more pending messages in the network, and otherwise True.
+        """
+        if self.fault_injector:
+            self.fault_injector.generate_faults(self)
+
         if not self.scheduler.has_pending_messages():
             print("No more messages to deliver.")
             return False
@@ -216,7 +259,7 @@ class Network:
         msg.mark_delivered(self.global_time)
         self.log_msg(msg)
 
-        # Update the successful_links set, if this is the first communication in that (sender, receiver) link
+        # Update the successful_links set, if this is the first communication for that (sender, receiver) link
         self.successful_links.add((msg.sender_id, msg.receiver_id))
 
         # Process handles message using its protocol to generate new traffic
@@ -225,6 +268,10 @@ class Network:
         raw_responses = receiver_process.handle_received_message(msg)
 
         for target_id, content in raw_responses:
+            # The network doesn't schedule messages to dead nodes
+            if not self.processes[target_id].alive:
+                continue
+
             new_msg = Message(
                 msg_id=self.msg_id_counter,
                 sender_id=receiver_process.id,
@@ -248,7 +295,10 @@ class Network:
         """
         print("\n")
         for pid, p in self.processes.items():
-            p.protocol.print_decision(pid, p.data)
+            if p.alive:
+                p.protocol.print_decision(pid, p.data)
+            else:
+                print(f"Process {pid} crashed.")
 
 
 # ---------------------------------------------------------
@@ -261,7 +311,7 @@ class Simulator:
     """
 
     def __init__(self, n: int, protocol: Protocol, traffic_generator: TrafficGenerator, scheduler: Scheduler,
-                 enable_full_logs: bool, analysis_interval: int, display_plots: bool):
+                 fault_injector: FaultInjector | None, enable_full_logs: bool, analysis_interval: int, display_plots: bool):
         """
         Initialize the simulation environment.
 
@@ -273,7 +323,7 @@ class Simulator:
         """
         self.n = n
         self.scheduler = scheduler
-        self.network = Network(self.scheduler, self.n, enable_full_logs)
+        self.network = Network(self.scheduler, self.n, fault_injector, enable_full_logs)
         self.network.initialize_processes(protocol)
         self.traffic_generator = traffic_generator
         self.analyzer = Analyzer(self.network)

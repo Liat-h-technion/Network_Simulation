@@ -1,7 +1,7 @@
 import random
 from collections import defaultdict, deque
 from typing import List, Tuple, Any, Dict, Set
-from simulation.framework import Scheduler, Protocol, TrafficGenerator, Message, Network
+from simulation.framework import Scheduler, Protocol, TrafficGenerator, Message, Network, FaultInjector
 
 
 # ---------------------------------------------------------
@@ -163,7 +163,7 @@ class Algorithm3Protocol(Protocol):
         valid = len(process_data['phase_round_senders'][(curr_phase, curr_round)])
 
         responses = []
-        if valid >= (n - self.f):
+        if valid >= (n - self.f - 1):
             # Starting a new round.
             process_data['phase_round_senders'].pop((curr_phase, curr_round))  # Cleanup old data (memory optimization)
             if curr_round < self.R:
@@ -247,13 +247,9 @@ class RandomAsynchronousScheduler(Scheduler):
         msg = self.buffers[s][r].popleft()
         self.pending_messages_counter -= 1
 
-        # If the messages deque for this link is now empty, remove it from active_links (O(1) removal with Swap-and-Pop)
+        # If the messages deque for this link is now empty, remove it from active_links
         if not self.buffers[s][r]:
-            last_link = self.active_links[-1]
-            self.active_links[chosen_idx] = last_link
-            self.links_indices[last_link] = chosen_idx
-            self.active_links.pop()
-            del self.links_indices[(s, r)]
+            self._remove_link((s, r))
 
         return msg
 
@@ -268,6 +264,30 @@ class RandomAsynchronousScheduler(Scheduler):
     def get_pending_messages_count(self) -> int:
         """Returns the amount of pending messages that are waiting to be delivered."""
         return self.pending_messages_counter
+
+    def handle_process_death(self, pid):
+        """Removes all pending messages where receiver_id == pid"""
+        for (s, r) in self.active_links:
+            if r == pid:
+                # Update pending messages count
+                count = len(self.buffers[s][r])
+                self.pending_messages_counter -= count
+
+                # Remove from buffers
+                del self.buffers[s][r]
+
+                # Remove from active_links
+                self._remove_link((s, r))
+
+    def _remove_link(self, link):
+        """Helper function to remove a (sender, receiver) link from the active_links list.
+        O(1) removal with Swap-and-Pop."""
+        idx = self.links_indices[link]
+        last_link = self.active_links[-1]
+        self.active_links[idx] = last_link
+        self.links_indices[last_link] = idx
+        self.active_links.pop()
+        del self.links_indices[link]
 
 
 # ---------------------------------------------------------
@@ -344,3 +364,31 @@ class Algorithm3TrafficGenerator(TrafficGenerator):
             for receiver_pid in range(network.n):
                 if sender_pid != receiver_pid:
                     network.create_initial_message(sender_pid, receiver_pid, content)
+
+
+# ---------------------------------------------------------
+# Fault Injector Strategies
+# ---------------------------------------------------------
+class ProbabilisticFaultInjector(FaultInjector):
+    """
+    At each step, with probability p, kills ONE randomly selected alive process, up to a maximum of 'max_faults' total
+    crashes. The "victim" process is chosen uniformly from the group of alive processes.
+    """
+    def __init__(self, p: float, max_faults: int, seed: int = None):
+        self.probability = p
+        self.max_faults = max_faults
+        self.faults_generated = 0
+        self.rng = random.Random(seed)
+
+    def generate_faults(self, network: Network):
+        if self.faults_generated >= self.max_faults:
+            return
+
+        if self.rng.random() < self.probability:
+            alive_pids = [p.id for p in network.processes.values() if p.alive]
+            if len(alive_pids) == 0:
+                return
+
+            victim_pid = self.rng.choice(alive_pids)
+            network.kill_process(victim_pid)
+            self.faults_generated += 1
