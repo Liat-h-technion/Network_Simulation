@@ -109,7 +109,7 @@ Below is a detailed list of all available flags in `main.py`:
 
 ### Protocols (Node Behavior)
 
-* **`alg3` (Algorithm 3):** Implements the consensus protocol for . Nodes maintain a map of signed values (`v_map`), exchange them over `R` rounds, and advance through phases to reach agreement.
+* **`alg3` (Algorithm 3):** Implements the protocol for Algorith 3 from the paper *Byzantine Consensus in the Random Asynchronous Model*. Nodes maintain a map of signed values (`v_map`), exchange them over `R` rounds, and advance through phases to reach agreement.
 
 
 * **`echo_all`:** When a node receives a message, it broadcasts a response to everyone else.
