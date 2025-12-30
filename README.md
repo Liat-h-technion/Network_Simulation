@@ -125,7 +125,7 @@ Below is a detailed list of all available flags in `main.py`:
 ### Traffic Generators
 
 * **`all_to_all`:** Injects an initial message from every node to every other node.
-* **`alg3`:** Initializes nodes with random binary inputs ( or ) and broadcasts the initial `v_map` to start the consensus process.
+* **`alg3`:** Initializes nodes with random binary inputs (0 or 1) and broadcasts the initial `v_map` to start the consensus process.
 * **`committee`:** Generates traffic either from everyone to the committee OR from the committee to everyone.
 
 ## Project Structure
