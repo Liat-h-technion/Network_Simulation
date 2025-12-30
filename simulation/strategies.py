@@ -160,10 +160,10 @@ class Algorithm3Protocol(Protocol):
         process_data['phase_round_senders'][(msg_phase, msg_round)].add(msg.sender_id)
 
         # valid is the amount of messages from distinct processes, sent in the current phase and round
-        valid = len(process_data['phase_round_senders'][(curr_phase, curr_round)])
+        valid = len(process_data['phase_round_senders'][(curr_phase, curr_round)]) + 1
 
         responses = []
-        if valid >= (n - self.f - 1):
+        if valid >= (n - self.f):
             # Starting a new round.
             process_data['phase_round_senders'].pop((curr_phase, curr_round))  # Cleanup old data (memory optimization)
             if curr_round < self.R:
@@ -391,4 +391,6 @@ class ProbabilisticFaultInjector(FaultInjector):
 
             victim_pid = self.rng.choice(alive_pids)
             network.kill_process(victim_pid)
+            network.scheduler.handle_process_death(victim_pid)
             self.faults_generated += 1
+            print(f"Process {victim_pid} was killed at time step {network.global_time}")
