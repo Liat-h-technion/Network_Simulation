@@ -94,16 +94,14 @@ class Analyzer:
             if connected_count == total_possible:
                 print("Topology: FULLY CONNECTED (Clique / Full Mesh)")
                 print("-> Every node communicated directly with every other node.")
-            else:
+            elif self.strongly_connected_at is None:
                 print("Topology: STRONGLY CONNECTED")
                 print("-> A directed path exists between every pair of nodes (Information flows everywhere).")
-                if self.strongly_connected_at is None:
-                    self.strongly_connected_at = self.network.global_time
-        else:
+                self.strongly_connected_at = self.network.global_time
+        elif self.weakly_connected_at is None:
             print("Topology: WEAKLY CONNECTED")
             print("-> The graph is one piece, but information cannot flow freely in all directions.")
-            if self.weakly_connected_at is None:
-                self.weakly_connected_at = self.network.global_time
+            self.weakly_connected_at = self.network.global_time
 
     def print_connectivity_milestones(self):
         if self.weakly_connected_at:
