@@ -266,7 +266,10 @@ class RandomAsynchronousScheduler(Scheduler):
         return self.pending_messages_counter
 
     def handle_process_death(self, pid):
-        """Removes all pending messages where receiver_id == pid"""
+        """
+        Removes all pending messages addressed to the dead pid.
+        If the dead pid has outgoing pending messages, they will still get delivered.
+        """
         for (s, r) in self.active_links:
             if r == pid:
                 # Update pending messages count
