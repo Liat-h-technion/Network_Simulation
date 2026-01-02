@@ -55,13 +55,9 @@ class RandomAsynchronousScheduler(Scheduler):
         msg = self.buffers[s][r].popleft()
         self.pending_messages_counter -= 1
 
-        # If the messages deque for this link is now empty, remove it from active_links (O(1) removal with Swap-and-Pop)
+        # If the messages deque for this link is now empty, remove it from active_links
         if not self.buffers[s][r]:
-            last_link = self.active_links[-1]
-            self.active_links[chosen_idx] = last_link
-            self.links_indices[last_link] = chosen_idx
-            self.active_links.pop()
-            del self.links_indices[(s, r)]
+            self._remove_link((s, r))
 
         return msg
 
@@ -76,3 +72,30 @@ class RandomAsynchronousScheduler(Scheduler):
     def get_pending_messages_count(self) -> int:
         """Returns the amount of pending messages that are waiting to be delivered."""
         return self.pending_messages_counter
+
+    def handle_process_death(self, pid):
+        """
+        Removes all pending messages addressed to the dead pid.
+        If the dead pid has outgoing pending messages, they will still get delivered.
+        """
+        for (s, r) in self.active_links:
+            if r == pid:
+                # Update pending messages count
+                count = len(self.buffers[s][r])
+                self.pending_messages_counter -= count
+
+                # Remove from buffers
+                del self.buffers[s][r]
+
+                # Remove from active_links
+                self._remove_link((s, r))
+
+    def _remove_link(self, link):
+        """Helper function to remove a (sender, receiver) link from the active_links list.
+        O(1) removal with Swap-and-Pop."""
+        idx = self.links_indices[link]
+        last_link = self.active_links[-1]
+        self.active_links[idx] = last_link
+        self.links_indices[last_link] = idx
+        self.active_links.pop()
+        del self.links_indices[link]

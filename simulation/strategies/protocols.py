@@ -155,8 +155,10 @@ class Algorithm3Protocol(Protocol):
             process_data['phase_round_senders'][(msg_phase, msg_round)] = set()
         process_data['phase_round_senders'][(msg_phase, msg_round)].add(msg.sender_id)
 
-        # valid is the amount of messages from distinct processes, sent in the current phase and round
-        valid = len(process_data['phase_round_senders'][(curr_phase, curr_round)])
+        # valid is the amount of messages from distinct processes, sent in the current phase and round.
+        # We assume the process has also "sent to itself" a message, so that the condition valid >= n-f can be
+        # satisfied in case of f faults.
+        valid = len(process_data['phase_round_senders'][(curr_phase, curr_round)]) + 1
 
         responses = []
         if valid >= (n - self.f):

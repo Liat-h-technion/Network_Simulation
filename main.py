@@ -4,6 +4,8 @@ from simulation.framework import Simulator
 from simulation.strategies.protocols import *
 from simulation.strategies.schedulers import *
 from simulation.strategies.traffic_generators import *
+from simulation.strategies.fault_injectors import *
+
 
 PROTOCOLS = {
     "alg3": Algorithm3Protocol,
@@ -40,6 +42,10 @@ def main():
                         help="Amount of rounds in each phase. Required parameter when running Algorithm 3.")
     parser.add_argument("--committee-size", type=int, help="Required parameter when using committee protocol.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for the scheduler.")
+    parser.add_argument("--enable-crash-faults", action="store_true")
+    parser.add_argument("--fault-prob", type=float, default=None,
+                        help="The probability of a crash fault occurring in a time step. This argument is used when "
+                             "simulating with a probabilistic fault injector.")
 
     parser.add_argument("--analysis-interval", type=int, default=None)
     parser.add_argument("--enable-full-logs", action="store_true")
@@ -72,12 +78,22 @@ def main():
     # Select Scheduler
     scheduler = SCHEDULERS[args.scheduler](seed=args.seed)
 
+    fault_injector = None
+    if args.enable_crash_faults:
+        p = args.fault_prob if args.fault_prob is not None else 1.0
+        fault_injector = ProbabilisticFaultInjector(
+            p=p,
+            max_faults=args.f,
+            seed=args.seed
+        )
+
     # Initialize and Run Simulator
     sim = Simulator(
         n=args.nodes,
         protocol=protocol,
         traffic_generator=traffic_generator,
         scheduler=scheduler,
+        fault_injector=fault_injector,
         enable_full_logs=args.enable_full_logs,
         analysis_interval=args.analysis_interval,
         display_plots=args.display_plots
