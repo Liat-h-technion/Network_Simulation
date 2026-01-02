@@ -394,6 +394,4 @@ class ProbabilisticFaultInjector(FaultInjector):
 
             victim_pid = self.rng.choice(alive_pids)
             network.kill_process(victim_pid)
-            network.scheduler.handle_process_death(victim_pid)
             self.faults_generated += 1
-            print(f"Process {victim_pid} was killed at time step {network.global_time}")
