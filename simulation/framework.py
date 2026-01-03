@@ -23,7 +23,7 @@ class Message:
         return f"<Msg {self.id}: {self.sender_id}->{self.receiver_id} content={self.content}>"
 
 
-# --- Abstract Interfaces (Protocol, Scheduler, TrafficGenerator, FaultInjector) ---
+# --- Abstract Interfaces (Protocol, Scheduler, FaultInjector) ---
 
 # ---------------------------------------------------------
 # Protocol Interface
@@ -114,25 +114,6 @@ class Scheduler(ABC):
 
     def handle_process_death(self, pid):
         """Remove all pending messages to the dead process."""
-        pass
-
-
-# ---------------------------------------------------------
-# TrafficGenerator Interface
-# ---------------------------------------------------------
-class TrafficGenerator(ABC):
-    """
-    Abstract Base Class for traffic initialization strategies.
-    Allows switching between different communication scenarios (All-to-All, One-to-One, etc.).
-    """
-
-    @abstractmethod
-    def generate(self, network: 'Network'):
-        """
-        Generates the initial messages and injects them into the network.
-        Args:
-            network: The Network instance to inject messages into.
-        """
         pass
 
 
