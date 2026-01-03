@@ -19,6 +19,9 @@ In each time-step of the simulation, a ***single*** sender-receiver link is chos
 * **Visualizations:** Histograms of message delays and network topology graphs using `matplotlib` and `networkx`.
 
 
+* **Crash Fault Injection:** Support for probabilistic crash faults (halting failures) during simulation execution.
+
+
 * **Modular Design:** Modular architecture for Protocols, Schedulers, and Traffic Generators.
 
 ## Installation
@@ -49,8 +52,7 @@ The simulation is controlled via `main.py` using command-line arguments.
 Run a simple "Echo" protocol where nodes broadcast messages upon receipt:
 
 ```bash
-python main.py --protocol echo_all --scheduler random --initial-traffic all_to_all --nodes 10 --max-steps 1000
-
+python main.py --protocol echo_all --scheduler random --nodes 10 --max-steps 1000
 ```
 
 ### Running Algorithm 3 (Consensus)
@@ -58,11 +60,18 @@ python main.py --protocol echo_all --scheduler random --initial-traffic all_to_a
 To simulate the Byzantine Consensus algorithm (n=2f+1) described in the paper:
 
 ```bash
-python main.py --protocol alg3 --scheduler random --initial-traffic alg3 --nodes 11 --R 20 --display-plots
-
+python main.py --protocol alg3 --scheduler random --nodes 11 --R 20 --display-plots
 ```
 
 * **Note:** When running `alg3`, the `--R` (rounds per phase) argument is **required**.
+
+### Running with Fault Injection
+To simulate a network where nodes crash probabilistically during execution:
+```bash
+python main.py --protocol alg3 --scheduler random --nodes 21 --R 20 --f 10 --fault-injector probabilistic --fault-prob 0.05
+```
+
+* **Note:** When using the probabilistic fault injector, the argument --f is **required**.
 
 ### Running the Committee Protocol
 
@@ -82,7 +91,7 @@ Below is a detailed list of all available flags in `main.py`:
 
 | Flag | Type | Required | Description                                                                                                                                                                                                                                                      |
 | --- | --- | --- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `--protocol` | `str` | **Yes** | The behavior logic for the nodes. Options: `alg3`, `echo_all`, `ping_pong`, `committee`.                                                                                                                                                                         |
+| `--protocol` | `str` | **Yes** | The behavior logic for the nodes. Options: `alg3`, `echo_all`, `random_single_message`, `ping_pong`, `committee`.                                                                                                                                                 |
 | `--scheduler` | `str` | **Yes** | The message delivery strategy. Options: `random` (Random Asynchronous Model).                                                                                                                                                                                    |
 | `--initial-traffic` | `str` | **Yes** | How the simulation creates initial messages. Options: `all_to_all`, `alg3`, `committee`.                                                                                                                                                                         |
 | `--nodes` | `int` | No | Total number of processes (`n`) in the network. Default: `20`.                                                                                                                                                                                                   |
@@ -94,9 +103,9 @@ Below is a detailed list of all available flags in `main.py`:
 
 ### Algorithm 3 Specific Flags
 
-| Flag  | Type | Description |
-|-------| --- | --- |
-| `--R` | `int` | **Required for alg3**. The number of communication rounds per phase. |
+| Flag  | Type | Description                                                                            |
+|-------| --- |----------------------------------------------------------------------------------------|
+| `--R` | `int` | **Required for alg3**. The number of communication rounds per phase.                   |
 | `--f` | `int` | The number of faulty nodes tolerated. Default is calculated as `(n-1)//2`. |
 
 ### Committee Specific Flags
@@ -105,16 +114,47 @@ Below is a detailed list of all available flags in `main.py`:
 | --- | --- | --- |
 | `--committee-size` | `int` | **Required for committee**. The number of nodes in the committee (IDs `0` to `size-1`). |
 
+### Fault Injection Flags
+
+| Flag | Type    | Description                                                                                                                      |
+| --- |---------|----------------------------------------------------------------------------------------------------------------------------------|
+| `--fault-injector` | `str`   | Type of fault injection to use. Options: `probabilistic`.                                                                        |
+| `--fault-prob` | `float` | Used with `probabilistic` fault injector. The probability (0.0 to 1.0) of a crash fault occurring in a time step. Default: `1.0`. |
+| `--f` | `int` | **Required for `probabilistic` fault injector**. The maximum number of faults injected to the network during the simulation.     |
+
+
 ## Implemented Strategies
 
 ### Protocols (Node Behavior)
 
+Each protocol defines:
+1. Initialization: How the process acts at the beginning of the simulation (generating initial traffic in the network to kickstart the simulation).
+2. Incoming message handling: How the process reacts to an incoming message.
+
+The provided protocols are as follows:
 * **`alg3` (Algorithm 3):** Implements the protocol for Algorith 3 from the paper *Byzantine Consensus in the Random Asynchronous Model*. Nodes maintain a map of signed values (`v_map`), exchange them over `R` rounds, and advance through phases to reach agreement.
+
+    Initialization: Broadcast the `v_map` with the initial self-signed value `v` to every other node.
 
 
 * **`echo_all`:** When a node receives a message, it broadcasts a response to everyone else.
-* **`ping_pong`:** A node replies only to the sender of the received message.
+
+    Initialization: Broadcast to every other node.
+
+
+* **`ping_pong`:** A node replies only to the sender of the received message. 
+
+    Initialization: Broadcast to every other node.
+
+
+* **`random_single_message`**: Upon receiving a message, sends a new message to a single process chosen randomly with uniform probability.
+
+    Initialization: Broadcast to every other node.
+
+
 * **`committee`:** Nodes with IDs `0` to `committee_size` broadcast to everyone. Regular nodes only report back to the committee.
+
+    Initialization: Broadcast to every committee member.
 
 ### Schedulers
 
@@ -122,11 +162,10 @@ Below is a detailed list of all available flags in `main.py`:
 
 
 
-### Traffic Generators
+### Fault Injectors
 
-* **`all_to_all`:** Injects an initial message from every node to every other node.
-* **`alg3`:** Initializes nodes with random binary inputs (0 or 1) and broadcasts the initial `v_map` to start the consensus process.
-* **`committee`:** Generates traffic either from everyone to the committee OR from the committee to everyone.
+* **`probabilistic`**: At each simulation step, with probability `p` (`--fault-prob`), kills **one** randomly selected alive process. This continues until a maximum of f faults is reached.
+
 
 ## Project Structure
 
@@ -140,5 +179,5 @@ Below is a detailed list of all available flags in `main.py`:
     └── strategies/                 
         ├── protocols.py            # Implementations of Protocol strategies
         ├── schedulers.py           # Implementations of Scheduler strategies
-        └── traffic_generators.py   # Implementations of Traffic Generator strategies
+        └── fault_injector.py       # Implementations of Fault Injector strategies
 ```
