@@ -3,9 +3,29 @@ from typing import List, Tuple, Any, Set
 from simulation.framework import Protocol, Message
 
 
-class EchoAllProtocol(Protocol):
+class BroadcastInitMixin:
+    """
+    A Mixin that provides a standard broadcast initialization.
+    Add this to any Protocol class to automatically get this behavior.
+    """
+    def create_initial_messages(self, my_pid: int, n: int, process_data: dict = None) -> List[Tuple[int, Any]]:
+        """
+        Broadcasts to every other process.
+        Returns:
+            List of (receiver, content) for the messages I want to send. This list is returned to the network, which
+            creates the messages and schedules them.
+        """
+        messages_data = []
+        for target_id in range(n):
+            if target_id != my_pid:
+                messages_data.append((target_id, f"INIT {my_pid}->{target_id}"))
+        return messages_data
+
+
+class EchoAllProtocol(BroadcastInitMixin, Protocol):
     """
     Upon receiving any message, broadcast a new message to every other process.
+    Initial traffic: Sends a messages to every other process.
     """
 
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
@@ -16,12 +36,19 @@ class EchoAllProtocol(Protocol):
                 responses.append((target_id, f"Response from {my_pid} to msg {msg.id}"))
         return responses
 
+    def create_initial_messages(self, my_pid: int, n: int, process_data: dict = None) -> List[Tuple[int, Any]]:
+        messages_data = []
+        for target_id in range(n):
+            if target_id != my_pid:
+                messages_data.append((target_id, f"INIT {my_pid}->{target_id}"))
+        return messages_data
+
 
 class RandomSingleMessageProtocol(Protocol):
     """
     Upon receiving any message, sends a new message to a single process, chosen randomly with uniform probability.
+    Initial traffic: Sends a messages to a single random node.
     """
-
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
         responses = []
         candidates = [pid for pid in range(n) if pid != my_pid]
@@ -31,17 +58,29 @@ class RandomSingleMessageProtocol(Protocol):
             responses.append((target_id, content))
         return responses
 
+    def create_initial_messages(self, my_pid: int, n: int, process_data: dict = None) -> List[Tuple[int, Any]]:
+        messages_data = []
+        candidates = [pid for pid in range(n) if pid != my_pid]
+        if candidates:
+            target_id = random.choice(candidates)
+            content = f"Random init {my_pid}->{target_id}"
+            messages_data.append((target_id, content))
+        return messages_data
 
-class RequestResponseProtocol(Protocol):
+
+class RequestResponseProtocol(BroadcastInitMixin, Protocol):
+    """
+    Upon receiving a message, responds only to the original sender, and only if the sender's message isn't a response.
+    In this protocol, each pair of nodes will communicate only once as request-response.
+    Initial traffic: Sends a messages to every other process.
+    """
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
-        # Responds only to the original sender, and only if the sender's message isn't a response.
-        # In this protocol, each pair of nodes will communicate only once as request-response.
         if "RESPONSE" not in str(msg.content):
             return [(msg.sender_id, f"RESPONSE from {my_pid}")]
         return []
 
 
-class PingPongProtocol(Protocol):
+class PingPongProtocol(BroadcastInitMixin, Protocol):
     def handle_message(self, my_pid: int, process_data: dict, msg: Message, n: int) -> List[Tuple[int, Any]]:
         # Responds to the sender of the received message.
         return [(msg.sender_id, f"Response from {my_pid}")]
@@ -52,6 +91,8 @@ class CommitteeProtocol(Protocol):
     A Committee-to-All network:
     1. Committee Members: Can send messages to anyone.
     2. Regular Nodes: Can send messages only to Committee Members.
+    Upon receiving any message, broadcasts to the committee members.
+    Initial traffic: Sends a message to all committee members.
     """
     def __init__(self, committee_ids: Set[int]):
         """
@@ -77,6 +118,14 @@ class CommitteeProtocol(Protocol):
                 responses.append((target_id, f"User Report from {my_pid} to Committee"))
 
         return responses
+
+    def create_initial_messages(self, my_pid: int, n: int, process_data: dict = None) -> List[Tuple[int, Any]]:
+        messages_data = []
+        for receiver in self.committee_ids:
+            if my_pid != receiver:
+                content = f"INIT from {my_pid} to committee member {receiver}"
+                messages_data.append((receiver, content))
+        return messages_data
 
 
 class Algorithm3Protocol(Protocol):
@@ -189,3 +238,26 @@ class Algorithm3Protocol(Protocol):
                     responses.append((target_id, new_msg_content))
 
         return responses
+
+    def create_initial_messages(self, my_pid: int, n: int, process_data: dict) -> List[Tuple[int, Any]]:
+        """
+            The process with id `my_pid` and data `process_data` is assigned a random initial value v from {0,1}. v is
+            added to the `v_map` of the process with its own signature and its id ad the origin id.
+            To kickstart the simulation, the process broadcast its v_map (with the initial value) to all other nodes.
+        """
+        v = random.choice([0, 1])
+        # Add the value v with sender_pid as the origin id and self signature
+        process_data["v_map"][my_pid] = (v, frozenset([my_pid]))
+        print(f"Process {my_pid} initial input is {v}")
+
+        content = {
+            "v_map": process_data["v_map"],
+            "round": process_data["round"],
+            "phase": process_data["phase"]
+        }
+
+        messages_data = []
+        for receiver_pid in range(n):
+            if my_pid != receiver_pid:
+                messages_data.append((receiver_pid, content))
+        return messages_data

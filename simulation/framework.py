@@ -30,7 +30,7 @@ class Message:
 # ---------------------------------------------------------
 class Protocol(ABC):
     """
-    Defines HOW a process reacts to a message.
+    Defines HOW a process reacts to a message, and how it acts when starting the simulation.
     """
 
     @abstractmethod
@@ -46,14 +46,23 @@ class Protocol(ABC):
             n: Total number of processes in the network.
 
         Returns:
-            A list of tuples, where each tuple contains:
-            (target_receiver_id, content_of_response)
+            A list of tuples, where each tuple contains: (target_receiver_id, content_of_response)
+        """
+        pass
+
+    def create_initial_messages(self, my_pid: int, n: int, process_data: dict | None) -> List[Tuple[int, Any]]:
+        """
+        Creates initial messages outgoing at the beginning of the simulation (at "time step 0").
+        Returns:
+            A list of tuples, where each tuple contains: (target_receiver_id, content)
         """
         pass
 
     def initialize_process_data(self) -> dict:
         """
-        TODO: Add a comment
+        Initializes the data field of the process.
+        The data is defined as a dict that can contain any keys required for the specific protocol that uses it.
+        Returns: A dict which the network will set as the process data.
         :return:
         """
         return {}
@@ -85,6 +94,7 @@ class Scheduler(ABC):
 
     @abstractmethod
     def add_message(self, msg: Message):
+        """Adds a message to the pending messages structure that the scheduler chooses from."""
         pass
 
     @abstractmethod
@@ -191,7 +201,7 @@ class Network:
 
     def kill_process(self, pid: int):
         """Handle process death from the network. The scheduler removes pending messages to this process."""
-        if self.processes[pid].alive:
+        if self._is_process_alive(pid):
             self.processes[pid].kill()
             # Remove pending messages to this node from the scheduler
             self.scheduler.handle_process_death(pid)
@@ -199,17 +209,8 @@ class Network:
             if self.enable_full_logs:
                 print(f"Process {pid} CRASHED at time step {self.global_time}")
 
-    def create_initial_message(self, sender_id, receiver_id, content):
-        """
-        Helper to kickstart the simulation.
-        Creates a new pending message from the sender to the receiver
-        """
-        if not self.processes[sender_id].alive or not self.processes[receiver_id].alive:
-            return
-        msg = Message(self.msg_id_counter, sender_id, receiver_id, self.global_time, content)
-        self.msg_id_counter += 1
-        self.scheduler.add_message(msg)
-        self.log_msg(msg)
+    def _is_process_alive(self, pid):
+        return self.processes[pid].alive
 
     def log_msg(self, msg: Message):
         delay = None
@@ -240,6 +241,22 @@ class Network:
         }
         self.logs.append(log_entry)
 
+    def create_initial_traffic(self):
+        """
+        Helper to kickstart the simulation.
+        Creates initial traffic in the network from each alive process, according its protocol.
+        """
+        for pid, process in self.processes.items():
+            if not self._is_process_alive(pid):
+                continue
+            initial_traffic = process.protocol.create_initial_messages(pid, self.n, process.data)
+            for receiver_id, content in initial_traffic:
+                if self._is_process_alive(receiver_id):
+                    msg = Message(self.msg_id_counter, pid, receiver_id, self.global_time, content)
+                    self.msg_id_counter += 1
+                    self.scheduler.add_message(msg)
+                    self.log_msg(msg)
+
     def run_step(self):
         """
         Executes exactly one event delivery in the network.
@@ -269,7 +286,7 @@ class Network:
 
         for target_id, content in raw_responses:
             # The network doesn't schedule messages to dead nodes
-            if not self.processes[target_id].alive:
+            if not self._is_process_alive(target_id):
                 continue
 
             new_msg = Message(
@@ -295,7 +312,7 @@ class Network:
         """
         print("\n")
         for pid, p in self.processes.items():
-            if p.alive:
+            if self._is_process_alive(pid):
                 p.protocol.print_decision(pid, p.data)
             else:
                 print(f"Process {pid} crashed.")
@@ -310,21 +327,19 @@ class Simulator:
     Responsible for initialization, execution, and providing analysis tools.
     """
 
-    def __init__(self, n: int, protocol: Protocol, traffic_generator: TrafficGenerator, scheduler: Scheduler,
-                 fault_injector: FaultInjector | None, enable_full_logs: bool, analysis_interval: int, display_plots: bool):
+    def __init__(self, n: int, protocol: Protocol, scheduler: Scheduler, fault_injector: FaultInjector | None,
+                 enable_full_logs: bool, analysis_interval: int, display_plots: bool):
         """
         Initialize the simulation environment.
 
         Args:
             n: Number of processes.
             protocol: The behavior strategy for processes. For now, we allow a single protocol of all process.
-            traffic_generator: Strategy for initial traffic.
             scheduler: The scheduling algorithm instance.
         """
         self.n = n
         self.network = Network(scheduler, self.n, protocol, enable_full_logs)
         self.fault_injector = fault_injector
-        self.traffic_generator = traffic_generator
         self.analyzer = Analyzer(self.network)
         self.analysis_interval = analysis_interval
         self.display_plots = display_plots
@@ -349,7 +364,7 @@ class Simulator:
         # Processes may crash even before sending initial traffic
         if self.fault_injector:
             self.fault_injector.generate_faults(self.network)
-        self.traffic_generator.generate(self.network)
+        self.network.create_initial_traffic()
         self.network.run_step()
 
         # Run the rest of the simulation until max_steps or until there are no pending messages in the network

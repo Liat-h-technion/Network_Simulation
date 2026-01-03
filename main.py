@@ -3,7 +3,6 @@ import argparse
 from simulation.framework import Simulator
 from simulation.strategies.protocols import *
 from simulation.strategies.schedulers import *
-from simulation.strategies.traffic_generators import *
 from simulation.strategies.fault_injectors import *
 
 
@@ -11,6 +10,7 @@ PROTOCOLS = {
     "alg3": Algorithm3Protocol,
     "echo_all": EchoAllProtocol,
     "ping_pong": PingPongProtocol,
+    "random_single_message": RandomSingleMessageProtocol,
     "committee": CommitteeProtocol
 }
 
@@ -18,10 +18,8 @@ SCHEDULERS = {
     "random": RandomAsynchronousScheduler
 }
 
-INITIAL_TRAFFIC = {
-    "all_to_all": AllToAllTrafficGenerator,
-    "alg3": Algorithm3TrafficGenerator,
-    "committee": CommitteeTrafficGenerator
+FAULT_INJECTORS = {
+    "probabilistic": ProbabilisticFaultInjector
 }
 
 
@@ -30,7 +28,7 @@ def main():
 
     parser.add_argument("--protocol", type=str, required=True, choices=PROTOCOLS.keys())
     parser.add_argument("--scheduler", type=str, required=True, choices=SCHEDULERS.keys())
-    parser.add_argument("--initial-traffic", type=str, required=True, choices=INITIAL_TRAFFIC.keys())
+    parser.add_argument("--fault-injector", type=str, required=False, choices=FAULT_INJECTORS.keys())
 
     parser.add_argument("--nodes", type=int, default=20)
     parser.add_argument("--max-steps", type=int, default=None,
@@ -42,8 +40,7 @@ def main():
                         help="Amount of rounds in each phase. Required parameter when running Algorithm 3.")
     parser.add_argument("--committee-size", type=int, help="Required parameter when using committee protocol.")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for the scheduler.")
-    parser.add_argument("--enable-crash-faults", action="store_true")
-    parser.add_argument("--fault-prob", type=float, default=None,
+    parser.add_argument("--fault-prob", type=float, default=1.0,
                         help="The probability of a crash fault occurring in a time step. This argument is used when "
                              "simulating with a probabilistic fault injector.")
 
@@ -68,30 +65,27 @@ def main():
     else:
         protocol = PROTOCOLS[args.protocol]()
 
-    # Select Initial Traffic Generator
-    if args.initial_traffic == "committee":
-        committee = set(range(args.committee_size))
-        traffic_generator = CommitteeTrafficGenerator(committee_ids=committee, mode='all-to-committee')
-    else:
-        traffic_generator = INITIAL_TRAFFIC[args.initial_traffic]()
-
     # Select Scheduler
     scheduler = SCHEDULERS[args.scheduler](seed=args.seed)
 
-    fault_injector = None
-    if args.enable_crash_faults:
-        p = args.fault_prob if args.fault_prob is not None else 1.0
+    # Select Fault Injector
+    if args.fault_injector == "probabilistic":
+        if args.f is None:
+            parser.error("argument --f is required when --fault-injector is set to 'probabilistic'")
         fault_injector = ProbabilisticFaultInjector(
-            p=p,
+            p=args.fault_prob,
             max_faults=args.f,
             seed=args.seed
         )
+    elif args.fault_injector is not None:
+        fault_injector = FAULT_INJECTORS[args.fault_injector]()
+    else:
+        fault_injector = None
 
-    # Initialize and Run Simulator
+    # Initialize and run Simulator
     sim = Simulator(
         n=args.nodes,
         protocol=protocol,
-        traffic_generator=traffic_generator,
         scheduler=scheduler,
         fault_injector=fault_injector,
         enable_full_logs=args.enable_full_logs,
