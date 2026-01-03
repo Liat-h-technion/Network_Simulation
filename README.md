@@ -80,17 +80,17 @@ python main.py --protocol committee --scheduler random --initial-traffic committ
 
 Below is a detailed list of all available flags in `main.py`:
 
-| Flag | Type | Required | Description                                                                                                                                                                        |
-| --- | --- | --- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `--protocol` | `str` | **Yes** | The behavior logic for the nodes. Options: `alg3`, `echo_all`, `ping_pong`, `committee`.                                                                                           |
-| `--scheduler` | `str` | **Yes** | The message delivery strategy. Options: `random` (Random Asynchronous Model).                                                                                                      |
-| `--initial-traffic` | `str` | **Yes** | How the simulation creates initial messages. Options: `all_to_all`, `alg3`, `committee`.                                                                                           |
-| `--nodes` | `int` | No | Total number of processes (`n`) in the network. Default: `20`.                                                                                                                       |
-| `--max-steps` | `int` | No | Stop simulation after this many delivery events. If omitted, runs until no messages remain.                                                                                        |
-| `--seed` | `int` | No | Seed for the random number generator to ensure reproducibility.                                                                                                                    |
-| `--analysis-interval` | `int` | No | Step interval to perform heavy network connectivity analysis (e.g., check for strong connectivity). A smaller value will give higher precision, but will slow down the simulation. |
-| `--display-plots` | `flag` | No | If set, displays `matplotlib` charts for delay distributions and topology.                                                                                                         |
-| `--enable-full-logs` | `flag` | No | If set, prints every single message delivery event to the console. **This flag is not recommended without a small `--max-steps` restriction.**                                     |
+| Flag | Type | Required | Description                                                                                                                                                                                                                                                      |
+| --- | --- | --- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--protocol` | `str` | **Yes** | The behavior logic for the nodes. Options: `alg3`, `echo_all`, `ping_pong`, `committee`.                                                                                                                                                                         |
+| `--scheduler` | `str` | **Yes** | The message delivery strategy. Options: `random` (Random Asynchronous Model).                                                                                                                                                                                    |
+| `--initial-traffic` | `str` | **Yes** | How the simulation creates initial messages. Options: `all_to_all`, `alg3`, `committee`.                                                                                                                                                                         |
+| `--nodes` | `int` | No | Total number of processes (`n`) in the network. Default: `20`.                                                                                                                                                                                                   |
+| `--max-steps` | `int` | No | Stop simulation after this many delivery events. If omitted, runs until no messages remain.                                                                                                                                                                      |
+| `--seed` | `int` | No | Seed for the random number generator to ensure reproducibility.                                                                                                                                                                                                  |
+| `--analysis-interval` | `int` | No | Step interval to perform heavy network connectivity analysis (e.g., check for strong connectivity). A smaller value will give higher precision, but will slow down the simulation. The analysis is performed until the network forms a strongly-connected graph. |
+| `--display-plots` | `flag` | No | If set, displays `matplotlib` charts for delay distributions and topology.                                                                                                                                                                                       |
+| `--enable-full-logs` | `flag` | No | If set, prints every single message delivery event to the console. **This flag is not recommended without a small `--max-steps` restriction.**                                                                                                                   |
 
 ### Algorithm 3 Specific Flags
 
