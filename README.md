@@ -78,7 +78,7 @@ python main.py --protocol alg3 --scheduler random --nodes 21 --R 20 --f 10 --fau
 To simulate a network with a specific subset of "privileged" nodes:
 
 ```bash
-python main.py --protocol committee --scheduler random --initial-traffic committee --nodes 20 --committee-size 5
+python main.py --protocol committee --scheduler random --nodes 20 --committee-size 5
 
 ```
 **Note:** 
@@ -93,7 +93,6 @@ Below is a detailed list of all available flags in `main.py`:
 | --- | --- | --- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `--protocol` | `str` | **Yes** | The behavior logic for the nodes. Options: `alg3`, `echo_all`, `random_single_message`, `ping_pong`, `committee`.                                                                                                                                                 |
 | `--scheduler` | `str` | **Yes** | The message delivery strategy. Options: `random` (Random Asynchronous Model).                                                                                                                                                                                    |
-| `--initial-traffic` | `str` | **Yes** | How the simulation creates initial messages. Options: `all_to_all`, `alg3`, `committee`.                                                                                                                                                                         |
 | `--nodes` | `int` | No | Total number of processes (`n`) in the network. Default: `20`.                                                                                                                                                                                                   |
 | `--max-steps` | `int` | No | Stop simulation after this many delivery events. If omitted, runs until no messages remain.                                                                                                                                                                      |
 | `--seed` | `int` | No | Seed for the random number generator to ensure reproducibility.                                                                                                                                                                                                  |
